@@ -1,10 +1,12 @@
 var read = require('node-readability');
 var request = require('request')
-var run = require('run-parallel')
+var run = require('run-series')
 var cheerio = require('cheerio')
 var path = require('path')
 var url = require('url')
 var concat = require('concat-stream')
+var fs = require('fs')
+var slugify = require('slugify')
 
 function inlineImages (page, cb) {
   var html = page.content
@@ -37,7 +39,6 @@ function inlineImages (page, cb) {
             // must be relative
             src = parsed.protocol + '//' + path.join(parsed.hostname, dir, src)
           }
-          console.error(el.attr('src'), src)
           request(src)
           .on('error', cb)
         .pipe(concat(function (buff) {
@@ -59,64 +60,106 @@ function inlineImages (page, cb) {
   }
 }
 
-function get (page, cb) {
-  read(page, function(err, article, meta) {
-    if (err) {
-     cb(null, null)
-     if (article) article.close()
-     return console.error(page, err)
-    }
-    article.url = page
-    cb(null, article)
+function getIA(page, cb) {
+  console.error('Getting from IA', page)
+  request('https://archive.org/wayback/available?url=' + encodeURIComponent(page), {json: true}, function (err, resp, body) {
+    if (err || resp.statusCode > 299) return cb(new Error('not cached in IA'))
+    var snaps = body.archived_snapshots
+    if (!snaps.closest || !snaps.closest.available) return cb(new Error('not cached in IA'))
+    return cb(null, snaps.closest.url)
+    
+//    function archive () {
+//      request('https://web.archive.org/save/' + page, function (err, resp, body) {
+//        if (err || resp.statusCode > 299) return cb(new Error('could not get IA version'))
+//        return cb(null, resp.request.uri)
+//      })
+//    }
   })
 }
 
-function render (pages) {
-  var body = ""
-  pages.forEach(function (page) { 
-    body += `<h3>${page.title}</h3>
-${page.inlined}<hr>` 
-  })
-
-  var style = `<style type="text/css">
-    body { 
-      font-size: 19.125px;
-      line-height: 30.6px;
-      font-family: NYTImperial, nyt-imperial, georgia, "times new roman", times, serif;
+function get (page, cb) {
+  getIA(page.url, function (err, archived) {
+    if (err) {
+      console.error(err.message, page.url)
+      return getReadable(page.url)
     }
-    img { max-width: 100%; }
-  </style>`
-  var tmp = `<html><head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></html>
-    ${style}
-    </head>
-    <body>
-    ${body}
-    </body>
-    </html>`
-  console.log(tmp)
+    getReadable(archived) 
+  })
+  function getReadable (href) {
+    console.error('Getting readable', href)
+  　read(href, {jar: true}, function (err, article, meta) {
+      if (err) {
+       cb(null, null)
+       if (article) article.close()
+       return console.error(page, err)
+      }
+      if (meta.statusCode > 299) {
+        cb(null, null)
+        if (article) article.close()
+        return console.error(meta.statusCode, href)
+      }
+      article.url = href
+      article.original = page.url
+      article.file = page.file
+      article.title = page.title
+      cb(null, article)
+    })
+  }
+}
+
+function render (page) {
+  var body = `<h3><a href="${page.url}">${page.title}</a></h3>
+${page.inlined}<hr>`
+  var full = renderFull(body)
+  fs.writeFileSync(page.file, full) 
+  console.error('Saved', page.file) 
+  function renderFull (body) {
+    var style = `<style type="text/css">
+      body { 
+        font-size: 19.125px;
+        line-height: 30.6px;
+        font-family: NYTImperial, nyt-imperial, georgia, "times new roman", times, serif;
+      }
+      img { max-width: 100%; }
+    </style>`
+    return `<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></html>
+      ${style}
+      </head>
+      <body>
+      ${body}
+      </body>
+      </html>`
+  }
 }
 
 
 request('https://www.reddit.com/r/indepthstories.json', {json: true}, function (err, resp, json) {
   var fns = []
   json.data.children.forEach(function (ch) {
-    var page = ch.data.url
+    var page = {
+      url: ch.data.url,
+      title: ch.data.title,
+      file: './articles/' + slugify(ch.data.title) + '.html'
+    }
+    if (fs.existsSync(page.file)) return
     fns.push(function (cb) {
       get(page, function (err, page) {
         if (err) {
-          err.page = page
+          err.url = page.url
           return cb(err)
         }
-        if (!page) return cb()
-        inlineImages(page, cb)
+        if (!page) return
+        inlineImages(page, function (err, page) {
+          if (err) return cb(err)
+          render(page)
+          setTimeout(cb, 0)
+  　　　})
       })
     })
   })
-  run(fns, function (err, results) {
-    console.error(err)
-    if (err) throw err
-    results = results.filter(x => !!x)
-    render(results)
+  run(fns, function (err)　{
+　　console.log('Done')
+    if (err) console.error(err)
   })
 })
