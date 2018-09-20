@@ -9,3 +9,5 @@ img { max-width: 100%; }
 h3 { font-size: 30px; }
 h3 a:visited { color: black; }
 h3 a { color: black; }
+figcaption, blockquote { font-style: italic; }
+p ~ div { border: 1px solid grey; }

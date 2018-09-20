@@ -39,13 +39,21 @@ function inlineImages (page, cb) {
             // must be relative
             src = parsed.protocol + '//' + path.join(parsed.hostname, dir, src)
           }
-          request(src)
-          .on('error', cb)
-        .pipe(concat(function (buff) {
-            var dataUri = "data:application/octet-stream;base64," + buff.toString("base64")
-            el.attr('src', dataUri)
-            cb()
-          }))
+          var tries = 3
+          getImage()
+          function getImage () {
+            request(src, {jar: true})
+              .on('error', function (err) {
+                console.error('Error', tries, src, err.message)
+                if (--tries > 0) return setTimeout(getImage, 10000)
+                cb(err)
+              })
+              .pipe(concat(function (buff) {
+                var dataUri = "data:application/octet-stream;base64," + buff.toString("base64")
+                el.attr('src', dataUri)
+                cb()
+              }))
+          }
         } else {
           cb()
         }
@@ -62,19 +70,26 @@ function inlineImages (page, cb) {
 
 function getIA(page, cb) {
   console.error('Getting from IA', page)
-  request('https://archive.org/wayback/available?url=' + encodeURIComponent(page), {json: true}, function (err, resp, body) {
-    if (err || resp.statusCode > 299) return cb(new Error('not cached in IA'))
-    var snaps = body.archived_snapshots
-    if (!snaps.closest || !snaps.closest.available) return cb(new Error('not cached in IA'))
-    return cb(null, snaps.closest.url)
-    
-//    function archive () {
-//      request('https://web.archive.org/save/' + page, function (err, resp, body) {
-//        if (err || resp.statusCode > 299) return cb(new Error('could not get IA version'))
-//        return cb(null, resp.request.uri)
-//      })
-//    }
-  })
+  tryDl()
+  function tryDl () {
+    request('https://archive.org/wayback/available?url=' + encodeURIComponent(page), {jar: true, json: true}, function (err, resp, body) {
+      if (err || resp.statusCode > 299) return cb(new Error('not cached in IA'))
+      var snaps = body.archived_snapshots
+      if (!snaps.closest || !snaps.closest.available) {
+        archive(function () {}) // ignore response
+        return cb(new Error('not cached in IA'))
+      }
+      return cb(null, snaps.closest.url)
+      
+      function archive (cb) {
+        request('https://web.archive.org/save/' + page, function (err, resp, body) {
+          if (err || resp.statusCode > 299) return cb(new Error('could not get IA version'))
+          return cb(null, resp.request.uri)
+        })
+      }
+    })
+  }
+
 }
 
 function get (page, cb) {
@@ -86,24 +101,32 @@ function get (page, cb) {
     getReadable(archived) 
   })
   function getReadable (href) {
-    console.error('Getting readable', href)
-  　read(href, {jar: true}, function (err, article, meta) {
-      if (err) {
-       cb(null, null)
-       if (article) article.close()
-       return console.error(page, err)
-      }
-      if (meta.statusCode > 299) {
-        cb(null, null)
-        if (article) article.close()
-        return console.error(meta.statusCode, href)
-      }
-      article.url = href
-      article.original = page.url
-      article.file = page.file
-      article.title = page.title
-      cb(null, article)
-    })
+    var tries = 3
+    console.error('Getting readable', tries, href)
+    tryDl()
+    function tryDl () {
+    　read(href, {jar: true}, function (err, article, meta) {
+        if (err) {
+         if (--tries > 0) {
+           console.error('Error, retrying', tries, err.message)
+           return setTimeout(tryDl, 10000)
+         }
+         cb(null, null)
+         if (article) article.close()
+         return console.error(page, err)
+        }
+        if (meta.statusCode > 299) {
+          cb(null, null)
+          if (article) article.close()
+          return console.error(meta.statusCode, href)
+        }
+        article.url = href
+        article.original = page.url
+        article.file = page.file
+        article.title = page.title
+        cb(null, article)
+      })
+    }
   }
 }
 
@@ -145,7 +168,7 @@ request('https://www.reddit.com/r/indepthstories.json?limit=100', {json: true}, 
         inlineImages(page, function (err, page) {
           if (err) return cb(err)
           render(page)
-          setTimeout(cb, 0)
+          setTimeout(cb, 1000)
   　　　})
       })
     })
