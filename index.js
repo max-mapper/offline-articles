@@ -114,17 +114,9 @@ ${page.inlined}<hr>`
   fs.writeFileSync(page.file, full) 
   console.error('Saved', page.file) 
   function renderFull (body) {
-    var style = `<style type="text/css">
-      body { 
-        font-size: 19.125px;
-        line-height: 30.6px;
-        font-family: NYTImperial, nyt-imperial, georgia, "times new roman", times, serif;
-      }
-      img { max-width: 100%; }
-    </style>`
     return `<html><head>
       <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></html>
-      ${style}
+      <link rel="stylesheet" href="style.css"/>
       </head>
       <body>
       ${body}
@@ -134,7 +126,7 @@ ${page.inlined}<hr>`
 }
 
 
-request('https://www.reddit.com/r/indepthstories.json', {json: true}, function (err, resp, json) {
+request('https://www.reddit.com/r/indepthstories.json?limit=100', {json: true}, function (err, resp, json) {
   var fns = []
   json.data.children.forEach(function (ch) {
     var page = {
