@@ -1,7 +1,7 @@
 {
-  "name": "news",
+  "name": "offline-articles",
   "version": "1.0.0",
-  "description": "",
+  "description": "- given a feed of article URLs - grabs latest version of html from internet archive - extracts just the article html using node-readability - fetches and inlines all images as data-uris - saves as an offline readable .html file",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -12,9 +12,19 @@
   "dependencies": {
     "cheerio": "^1.0.0-rc.2",
     "concat-stream": "^1.6.2",
+    "electron-ad-blocker": "^0.2.0",
     "node-readability": "^3.0.0",
     "run-parallel": "^1.1.9",
     "run-series": "^1.1.8",
     "slugify": "^1.3.1"
-  }
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maxogden/offline-articles.git"
+  },
+  "bugs": {
+    "url": "https://github.com/maxogden/offline-articles/issues"
+  },
+  "homepage": "https://github.com/maxogden/offline-articles#readme"
 }

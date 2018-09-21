@@ -1,13 +1,20 @@
 body {
-  width: 800px;
-  margin: 20px auto;
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
   font-size: 19.125px;
   line-height: 30.6px;
   font-family: NYTImperial, nyt-imperial, georgia, "times new roman", times, serif;
+  color: rgb(51, 51, 51);
 }
 img { max-width: 100%; }
-h3 { font-size: 30px; }
-h3 a:visited { color: black; }
-h3 a { color: black; }
+.news-title { margin: 20px 0; font-style: italic; font-size: 32.7038px; line-height: 38.25px; font-family: NYTCheltenham, nyt-cheltenham, georgia, "times new roman", times, serif; }
+.news-title a:visited { color: rgb(18, 18, 18); }
+.news-title a { color: rgb(18, 18, 18); text-decoration: none; }
+.news-domain a { text-decoration: none; border-bottom: 1px solid rgb(51, 51, 51); font-size: 18px; line-height: 26.6333px; }
 figcaption, blockquote { font-style: italic; }
 p ~ div { border: 1px solid grey; }
+#readability-page-1 { border: none; }
+a { color: rgb(50, 104, 145); }
+.news-byline { margin: 0 0 10px 0; font-family: NYTFranklin; font-size: 14.3438px; font-weight: 700; }
+.news-link { font-size: 10px; line-height: 17px; }
