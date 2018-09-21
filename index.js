@@ -1,4 +1,4 @@
-var { ipcMain, app, BrowserWindow } = require('electron')
+var { ipcMain, app, BrowserWindow, session } = require('electron')
 const { blockWindowAds, adBlocker } = require('electron-ad-blocker')
 var request = require('request')
 var run = require('run-series')
@@ -16,6 +16,12 @@ app.on('ready', function () {
 //  win.toggleDevTools()
   win.on('closed', function () {
     win = null
+  })
+
+  session.defaultSession.webRequest.onHeadersReceived(function (details, callback) {
+    var contentType = details.responseHeaders['Content-Type']
+    if (contentType && contentType.indexOf('application/pdf') > -1) return callback({cancel: true})
+    callback({cancel: false, responseHeaders: details.responseHeaders})
   })
   blockWindowAds(win)
   start()
@@ -80,7 +86,7 @@ function start () {
             err.url = page.url
             return cb(err)
           }
-          if (!page) return
+          if (!page) return cb()
           
           render(page)
           return setTimeout(cb, 1000)
@@ -202,6 +208,10 @@ function get (page, cb) {
     　read(href, function (err, article) {
         if (err) {
          if (--tries > 0) {
+           if (err.message.indexOf('ERR_BLOCKED_BY_CLIENT') > -1) {
+             console.error('blocked by client, skipping')
+             return cb(null, null)
+           }
            console.error('Error, retrying', tries, err.message)
            return setTimeout(tryDl, 10000)
          }
